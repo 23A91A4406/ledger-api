@@ -2,15 +2,15 @@
 A production-grade financial ledger API implementing double-entry bookkeeping, immutable transactions, accurate balance calculation, and safe concurrent transfers using FastAPI + PostgreSQL.
 ________________________________________
 ### Features Implemented
-✔ Create accounts
-✔ Credit & debit transactions
-✔ Atomic money transfers (debit + credit)
-✔ Immutable ledger entries
-✔ Accurate balance computed from ledger
-✔ Full transaction history per account
-✔ Swagger Documentation
-✔ PostgreSQL persistence
-✔ SQLAlchemy session transactions
+* Create accounts
+* Credit & debit transactions
+* Atomic money transfers (debit + credit)
+* Immutable ledger entries
+* Accurate balance computed from ledger
+* Full transaction history per account
+* Swagger Documentation
+* PostgreSQL persistence
+* SQLAlchemy session transactions
 ________________________________________
 ### Project Folder Structure
 ledger-api/
@@ -35,12 +35,12 @@ ________________________________________
 ________________________________________
 ### API Endpoints Overview
 Method	Endpoint	Description
-POST	/accounts	Create a new account
-GET	/accounts	Get all accounts
-GET	/accounts/{account_id}	Get account details with computed balance
-POST	/transactions	Create transfer,deposit,or withdrawal
-GET	/transactions	Get all transactions
-GET	/ledger/{account_id}	Ledger entries (immutable)
+POST /accounts | Create a new account
+GET /accounts | Get all accounts
+GET /accounts/{account_id} | Get account details and current balance
+POST /transactions | Create transfer, deposit, or withdrawal
+GET /transactions | Get all transactions
+GET /ledger/{account_id} | Get immutable ledger entries for an account
 ________________________________________
 ### How the Ledger System Works
  Double Entry Bookkeeping
@@ -207,7 +207,7 @@ ________________________________________
 ### How to Run
 1. Make sure Docker and Docker Compose are installed.
 2. Clone the repository:
-git clone <your-repo-url>
+git clone <repo-url>
 cd ledger-api
 3. Start the application using Docker:
 docker-compose up --build
