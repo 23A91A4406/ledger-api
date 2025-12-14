@@ -194,15 +194,16 @@ User (Swagger / Postman)
 | 3              | 1       | credit    | 300    | 2(deposit) |           
 | 4              | 2       | debit     | 100    | 3(withdraw)|           
 ________________________________________
-### Expected Outcomes 
-✔ Fully functional REST API
-✔ Atomic transfers
-✔ Immutable ledger
-✔ Safe concurrency via SQLAlchemy database transactions
-✔ Negative balances prevented
-✔ Balance derived from ledger entries
-✔ Complete history available
-✔ Production-ready structure
+### Expected Outcomes
+
+* Fully functional REST API
+* Atomic transfers
+* Immutable ledger
+* Safe concurrency via SQLAlchemy database transactions
+* Negative balances prevented
+* Balance derived from ledger entries
+* Complete history available
+* Production-ready structure
 ________________________________________
 ### How to Run
 1. Make sure Docker and Docker Compose are installed.
