@@ -48,13 +48,17 @@ GET /ledger/{account_id} | Get immutable ledger entries for an account
 ________________________________________
 ### How the Ledger System Works
 
-Double Entry Bookkeeping
-Every transaction creates ledger entries:
-•	Credit transaction → credit amount
-•	Debit transaction → debit amount
- Ledger Is Immutable
-Once written, entries are never edited or deleted
-________________________________________
+  Double Entry Bookkeeping  
+Every transaction creates ledger entries:  
+• Credit transaction → credit amount  
+• Debit transaction → debit amount  
+
+  Ledger Is Immutable  
+Once written, entries are never edited or deleted. The ledger acts as a permanent audit trail.  
+
+  Balance Calculation  
+Account balances are **calculated on-demand** by summing all corresponding ledger entries (credits minus debits). This ensures the ledger is the **single source of truth**, and prevents discrepancies between stored balances and transaction history.
+____________________________________________
 ### Balance Calculation Strategy
 
 In this implementation, account balances are stored and updated atomically during transactions while ledger entries remain immutable and serve as the authoritative
