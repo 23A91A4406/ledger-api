@@ -22,8 +22,8 @@ ledger-api/
 │   ├── db.py
 │   └── ...
 ├── docker-compose.yml
-├── requirements.txt
-└── README.md
+├── requirements.txt and Screenshots
+└── README.md and Dockerfile
 
 ________________________________________
 ### Tech Stack
@@ -55,24 +55,14 @@ Every transaction creates ledger entries:
 
   Ledger Is Immutable  
 Once written, entries are never edited or deleted. The ledger acts as a permanent audit trail.  
-
-  Balance Calculation  
-Account balances are **calculated on-demand** by summing all corresponding ledger entries (credits minus debits). This ensures the ledger is the **single source of truth**, and prevents discrepancies between stored balances and transaction history.
 ____________________________________________
 ### Balance Calculation Strategy
 
-In this implementation, account balances are stored and updated atomically during transactions while ledger entries remain immutable and serve as the authoritative
-audit trail.
+In this implementation, account balances are maintained atomically during transactions, while the immutable ledger serves as the authoritative audit trail for balance verification.
 
-Design Rationale:
-- Ledger entries are append-only and represent the true financial history.
-- Account balances are updated within the same database transaction as ledger entries.
-- Sufficient balance checks are performed before committing the transaction.
-
-Tradeoff:
-- Balances are not recalculated on-demand from ledger entries in this version.
-- The ledger remains the source of truth for auditing and verification.
-__________________________________________
+For production systems, balances can be recalculated on-demand from ledger entries.
+This implementation prioritizes transactional performance while preserving ledger correctness.
+_________________________________________
 ### API Usage Examples 
 
 1. Create Account
@@ -237,6 +227,37 @@ cd ledger-api
 docker-compose up --build
 4. Open Swagger UI:
 http://localhost:8000/docs
+_________________________________________
+### Screenshots
+
+1. Swagger UI
+![Swagger UI](screenshots/1SwaggerUI.png)
+
+2. Account 1 Created
+![Account 1 Created](screenshots/2Acc1Created.png)
+
+3. Account 2 Created
+![Account 2 Created](screenshots/3Acc2Created.png)
+
+4. Transfer Transaction
+![Transfer Transaction](screenshots/4Transfer-Transaction.png)
+
+5. Account 1 Balance
+![Account 1 Balance](screenshots/6Acc1Balance.png)
+
+6. Account 2 Balance
+![Account 2 Balance](screenshots/7Acc2Balance.png)
+
+7. Debit Ledger Entry
+![Debit Entry](screenshots/8debitEntry.png)
+
+8. Credit Ledger Entry
+![Credit Entry](screenshots/9creditEntry.png)
+
+9. Deposit Transaction
+![Deposit](screenshots/10Deposit.png)
+
+__________________________________________
 ### Conclusion
 
 This project demonstrates:

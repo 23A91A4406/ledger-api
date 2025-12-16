@@ -1,23 +1,21 @@
+import time
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import OperationalError
+from sqlalchemy.orm import sessionmaker, declarative_base
 
-# PostgreSQL connection URL
-DATABASE_URL = "postgresql://ledger_user:ledger_pass@db:5432/ledger_db"
+DATABASE_URL = "postgresql://postgres:postgres@db:5432/ledger"
 
-# Create the SQLAlchemy engine
-engine = create_engine(DATABASE_URL)
+engine = None
+for i in range(10):
+    try:
+        engine = create_engine(DATABASE_URL)
+        engine.connect()
+        print("✅ Database connected")
+        break
+    except OperationalError:
+        print("⏳ Database not ready, retrying...")
+        time.sleep(2)
 
-# Create a configured "Session" class
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# Base class for models
 Base = declarative_base()
 
-# Dependency to get DB session
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
