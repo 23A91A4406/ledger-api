@@ -1,183 +1,140 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from app.db import engine, SessionLocal, Base
-from app import models
-from pydantic import BaseModel
-from typing import Optional
 from decimal import Decimal
 
-# Create all tables in the database
-Base.metadata.create_all(bind=engine)
+from app.db import get_db, engine
+from app import models, schemas
+from app.services import (
+    create_transfer,
+    create_deposit,
+    create_withdrawal,
+    InsufficientFundsError
+)
+from app.utils import calculate_account_balance
 
-app = FastAPI(title="Ledger API", version="0.1.0")
+app = FastAPI(title="Financial Ledger API")
 
-# --------------------------
-# DB Dependency
-# --------------------------
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# Create tables
+models.Base.metadata.create_all(bind=engine)
 
-# --------------------------
-# Pydantic Schemas
-# --------------------------
-class AccountCreate(BaseModel):
-    name: str
-    balance: Optional[Decimal] = 0.0
-    currency: Optional[str] = "USD"
+# ------------------ ACCOUNTS ------------------
 
-class AccountResponse(BaseModel):
-    id: int
-    name: str
-    balance: Decimal
-    currency: str
-
-    class Config:
-        orm_mode = True
-
-class TransactionCreate(BaseModel):
-    type: str
-    source_account_id: Optional[int] = None
-    destination_account_id: Optional[int] = None
-    amount: Decimal
-    description: Optional[str] = None
-
-class TransactionResponse(BaseModel):
-    id: int
-    type: str
-    source_account_id: Optional[int]
-    destination_account_id: Optional[int]
-    amount: Decimal
-    status: str
-
-    class Config:
-        orm_mode = True
-
-# --------------------------
-# Account Endpoints
-# --------------------------
-@app.post("/accounts/", response_model=AccountResponse)
-def create_account(account: AccountCreate, db: Session = Depends(get_db)):
-    db_account = models.Account(
-        name=account.name,
-        balance=account.balance,
+@app.post("/accounts", response_model=schemas.AccountResponse)
+def create_account(
+    account: schemas.AccountCreate,
+    db: Session = Depends(get_db)
+):
+    new_account = models.Account(
+        user_name=account.user_name,
+        account_type=account.account_type,
         currency=account.currency
     )
-    db.add(db_account)
+    db.add(new_account)
     db.commit()
-    db.refresh(db_account)
-    return db_account
+    db.refresh(new_account)
 
-@app.get("/accounts/{account_id}", response_model=AccountResponse)
+    # ✅ RETURN WITH BALANCE
+    return {
+        "id": new_account.id,
+        "user_name": new_account.user_name,
+        "account_type": new_account.account_type,
+        "currency": new_account.currency,
+        "status": new_account.status,
+        "balance": calculate_account_balance(db, new_account.id)
+    }
+
+
+@app.get("/accounts/{account_id}", response_model=schemas.AccountResponse)
 def get_account(account_id: int, db: Session = Depends(get_db)):
-    db_account = db.query(models.Account).filter(models.Account.id == account_id).first()
-    if not db_account:
+    account = db.get(models.Account, account_id)
+    if not account:
         raise HTTPException(status_code=404, detail="Account not found")
-    return db_account
 
-@app.get("/accounts/", response_model=list[AccountResponse])
-def list_accounts(db: Session = Depends(get_db)):
-    return db.query(models.Account).all()
+    return {
+        "id": account.id,
+        "user_name": account.user_name,
+        "account_type": account.account_type,
+        "currency": account.currency,
+        "status": account.status,
+        "balance": calculate_account_balance(db, account.id)
+    }
 
-# --------------------------
-# Transaction Endpoints
-# --------------------------
-@app.post("/transactions/", response_model=TransactionResponse)
-def create_transaction(transaction: TransactionCreate, db: Session = Depends(get_db)):
-    # Validate accounts
-    if transaction.type in ["transfer", "withdrawal"]:
-        source_account = db.query(models.Account).filter(models.Account.id == transaction.source_account_id).first()
-        if not source_account:
-            raise HTTPException(status_code=404, detail="Source account not found")
-        if source_account.balance < transaction.amount:
-            raise HTTPException(status_code=400, detail="Insufficient funds")
 
-    if transaction.type in ["transfer", "deposit"]:
-        if transaction.destination_account_id:
-            dest_account = db.query(models.Account).filter(models.Account.id == transaction.destination_account_id).first()
-            if not dest_account:
-                raise HTTPException(status_code=404, detail="Destination account not found")
+# ------------------ LEDGER ------------------
 
-    # Create transaction
-    db_transaction = models.Transaction(
-        type=transaction.type,
-        source_account_id=transaction.source_account_id,
-        destination_account_id=transaction.destination_account_id,
-        amount=transaction.amount,
-        description=transaction.description,
-        status=models.TransactionStatus.completed
-    )
-    db.add(db_transaction)
+@app.get(
+    "/accounts/{account_id}/ledger",
+    response_model=list[schemas.LedgerEntryResponse]
+)
+def get_ledger(account_id: int, db: Session = Depends(get_db)):
+    account = db.get(models.Account, account_id)
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
 
-    # Ledger entries & balances
-    if transaction.type == "deposit" and transaction.destination_account_id:
-        dest_account.balance += transaction.amount
-        db.add(models.LedgerEntry(
-            account_id=transaction.destination_account_id,
-            transaction=db_transaction,
-            entry_type=models.EntryType.credit,
-            amount=transaction.amount
-        ))
-    elif transaction.type == "withdrawal" and transaction.source_account_id:
-        source_account.balance -= transaction.amount
-        db.add(models.LedgerEntry(
-            account_id=transaction.source_account_id,
-            transaction=db_transaction,
-            entry_type=models.EntryType.debit,
-            amount=transaction.amount
-        ))
-    elif transaction.type == "transfer":
-        source_account.balance -= transaction.amount
-        dest_account.balance += transaction.amount
-        db.add(models.LedgerEntry(
-            account_id=transaction.source_account_id,
-            transaction=db_transaction,
-            entry_type=models.EntryType.debit,
-            amount=transaction.amount
-        ))
-        db.add(models.LedgerEntry(
-            account_id=transaction.destination_account_id,
-            transaction=db_transaction,
-            entry_type=models.EntryType.credit,
-            amount=transaction.amount
-        ))
-
-    db.commit()
-    db.refresh(db_transaction)
-    return db_transaction
-
-# --------------------------
-# Ledger Endpoints
-# --------------------------
-
-@app.get("/ledger/{account_id}")
-def get_ledger_entries(account_id: int, db: Session = Depends(get_db)):
-    entries = (
+    return (
         db.query(models.LedgerEntry)
         .filter(models.LedgerEntry.account_id == account_id)
+        .order_by(models.LedgerEntry.created_at)
         .all()
     )
 
-    if not entries:
-        raise HTTPException(status_code=404, detail="No ledger entries found")
 
-    return [
-        {
-            "id": entry.id,
-            "transaction_id": entry.transaction_id,
-            "entry_type": entry.entry_type,
-            "amount": str(entry.amount),
-            "timestamp": entry.timestamp
-        }
-        for entry in entries
-    ]
+# ------------------ TRANSACTIONS ------------------
 
-# --------------------------
-# Root Endpoint
-# --------------------------
-@app.get("/")
-def root():
-    return {"message": "Ledger API is running"}
+@app.post("/transfers", response_model=schemas.TransactionResponse)
+def transfer_funds(
+    payload: schemas.TransferCreate,
+    db: Session = Depends(get_db)
+):
+    try:
+        return create_transfer(
+            db,
+            payload.source_account_id,
+            payload.destination_account_id,
+            Decimal(payload.amount),
+            payload.description
+        )
+    except InsufficientFundsError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Insufficient funds"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/deposits", response_model=schemas.TransactionResponse)
+def deposit_funds(
+    payload: schemas.DepositCreate,
+    db: Session = Depends(get_db)
+):
+    try:
+        return create_deposit(
+            db,
+            payload.destination_account_id,
+            Decimal(payload.amount),
+            payload.description
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/withdrawals", response_model=schemas.TransactionResponse)
+def withdraw_funds(
+    payload: schemas.WithdrawalCreate,
+    db: Session = Depends(get_db)
+):
+    try:
+        return create_withdrawal(
+            db,
+            payload.source_account_id,
+            Decimal(payload.amount),
+            payload.description
+        )
+    except InsufficientFundsError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Insufficient funds"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

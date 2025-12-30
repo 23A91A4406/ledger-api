@@ -1,29 +1,36 @@
 ### Financial Ledger API — Double Entry Accounting System
-A production-grade financial ledger API implementing double-entry bookkeeping, immutable transactions, accurate balance calculation, and safe concurrent transfers using FastAPI + PostgreSQL.
+A production-grade Financial Ledger API implementing double-entry bookkeeping, immutable transactions, accurate balance handling, and atomic concurrent transfers using FastAPI and PostgreSQL.
 ________________________________________
 ### Features Implemented
 
-* Create accounts
-* Credit & debit transactions
-* Atomic money transfers (debit + credit)
-* Immutable ledger entries
-* Accurate balance computed from ledger
-* Full transaction history per account
-* Swagger Documentation
-* PostgreSQL persistence
-* SQLAlchemy session transactions
+• Create financial accounts
+• Credit and debit transactions
+• Atomic money transfers (debit + credit)
+• Immutable ledger entries
+• Accurate balance updates within transactions
+• Complete transaction history per account
+• Swagger (OpenAPI) documentation
+• PostgreSQL persistence
+• SQLAlchemy transactional session handling
 ________________________________________
 ### Project Folder Structure
 
 ledger-api/
 ├── app/
-│   ├── main.py
-│   ├── models.py
-│   ├── db.py
-│   └── ...
+│ ├── init_db.py
+│ ├── main.py
+│ ├── db.py 
+│ ├── models.py 
+│ ├── schemas.py 
+│ ├── services.py 
+│ ├── utils.py 
+│ ├── test_db.py 
+├── screenshots/
 ├── docker-compose.yml
-├── requirements.txt and Screenshots
-└── README.md and Dockerfile
+├── Dockerfile
+├── requirements.txt
+├── README.md
+└── .gitignore
 
 ________________________________________
 ### Tech Stack
@@ -38,83 +45,131 @@ ________________________________________
 ________________________________________
 ### API Endpoints Overview
 
-Method	Endpoint	Description
-POST /accounts | Create a new account
-GET /accounts | Get all accounts
-GET /accounts/{account_id} | Get account details and current balance
-POST /transactions | Create transfer, deposit, or withdrawal
-GET /transactions | Get all transactions
-GET /ledger/{account_id} | Get immutable ledger entries for an account
+1. POST /accounts 
+   Create a new account
+
+2. GET /accounts/{accountId} 
+   Retrieve account details 
+
+3. GET /accounts/{accountId}/ledger 
+   Fetch  ledger entries for an account
+
+4. POST /transactions
+   Handle deposit, withdrawal, and transfer transactions
 ________________________________________
 ### How the Ledger System Works
 
-  Double Entry Bookkeeping  
-Every transaction creates ledger entries:  
-• Credit transaction → credit amount  
-• Debit transaction → debit amount  
+Double Entry Bookkeeping
+Every financial transaction generates ledger entries:
 
-  Ledger Is Immutable  
-Once written, entries are never edited or deleted. The ledger acts as a permanent audit trail.  
+• Debit entry → amount deducted from an account
+• Credit entry → amount added to an account
+
+Each transfer creates two ledger entries (one debit, one credit) linked by a single transaction record.
+
+Ledger Is Immutable
+Once written, ledger entries are never updated or deleted.
+This provides a permanent and auditable financial history. 
 ____________________________________________
 ### Balance Calculation Strategy
 
-In this implementation, account balances are maintained atomically during transactions, while the immutable ledger serves as the authoritative audit trail for balance verification.
+Account balances are updated atomically during transactions to ensure performance and consistency.
 
-For production systems, balances can be recalculated on-demand from ledger entries.
-This implementation prioritizes transactional performance while preserving ledger correctness.
+The immutable ledger acts as the source of truth and can be used to fully reconstruct balances if required.
+
+This approach mirrors real-world production financial systems.
 _________________________________________
-### API Usage Examples 
+### API Usage Examples
+
+Base URL: http://localhost:8000
 
 1. Create Account
+
 Request
 POST /accounts
+
+Request Body
 {
-  "name": "Mona Savings",
-  "balance": 1000
+"name": "Mona Savings",
+"balance": 1000,
+"currency": "USD"
 }
 
-2️. Transfer Transaction
+Response
+{
+"id": 1,
+"name": "Mona Savings",
+"balance": "1000.00",
+"currency": "USD"
+}
+
+2. Deposit Transaction
+
 Request
 POST /transactions
+
+Request Body
 {
-  "type": "transfer",
-  "source_account_id": 1,
-  "destination_account_id": 2,
-  "amount": 200,
-  "description": "Transfer from savings to checking"
+"type": "deposit",
+"destination_account_id": 1,
+"amount": 300,
+"description": "Initial deposit"
 }
- 
-3️. Verify Account Balances
+
+3. Transfer Transaction
+
+Request
+POST /transactions
+
+Request Body
+{
+"type": "transfer",
+"source_account_id": 1,
+"destination_account_id": 2,
+"amount": 200,
+"description": "Transfer from savings to checking"
+}
+
+4. Verify Account Balance
+
 Request
 GET /accounts/1
+
+Response
 {
-  "id": 1,
-  "name": "Mona Savings",
-  "balance": "800.00",
-  "currency": "USD"
+"id": 1,
+"name": "Mona Savings",
+"balance": "800.00",
+"currency": "USD"
 }
 
-4️. Ledger Entries
+5. View Ledger Entries
+
 Request
-GET /ledger/1
+GET /accounts/1/ledger
+
+Response
 [
-  {
-    "id": 1,
-    "transaction_id": 1,
-    "entry_type": "debit",
-    "amount": "200.00",
-    "timestamp": "2025-12-14T11:58:38.531946+00:00"
-  }
+{
+"id": 1,
+"transaction_id": 1,
+"entry_type": "debit",
+"amount": "200.00",
+"timestamp": "2025-12-30T13:32:51.730Z"
+}
 ]
 
-5️. Deposit & Withdrawal
+6. Withdrawal Transaction
+
 Request
-POST /transactions/
+POST /transactions
+
+Request Body
 {
-  "type": "deposit",
-  "destination_account_id": 1,
-  "amount": 300,
-  "description": "Deposit paycheck"
+"type": "withdrawal",
+"source_account_id": 1,
+"amount": 100,
+"description": "ATM withdrawal"
 }
 _____________________________________________
 ### Diagrams
@@ -199,70 +254,74 @@ User (Swagger / Postman)
 
 
  3. Double-Entry Ledger Diagram
-|LedgerEntry ID |Account |Entry Type   | Amount |Transaction ID|
-|----------------|---------|-----------|--------|------------|
-| 1              | 1       | debit     | 200    | 1(transfer)|           
-| 2              | 2       | credit    | 200    | 1(transfer)|           
-| 3              | 1       | credit    | 300    | 2(deposit) |           
-| 4              | 2       | debit     | 100    | 3(withdraw)|           
+LedgerEntry ID | Account | Entry Type | Amount | Transaction
+1              | 1       | debit      | 200    | transfer
+2              | 2       | credit     | 200    | transfer
+3              | 1       | credit     | 300    | deposit
+4              | 2       | debit      | 100    | withdrawal         
 ________________________________________
 ### Expected Outcomes
 
-* Fully functional REST API
-* Atomic transfers
-* Immutable ledger
-* Safe concurrency via SQLAlchemy database transactions
-* Negative balances prevented
-* Balance derived from ledger entries
-* Complete history available
-* Production-ready structure
+• Fully functional REST API
+• Atomic financial transfers
+• Immutable ledger design
+• Safe concurrency using database transactions
+• Prevention of negative balances
+• Complete financial audit trail
+• Production-ready architecture
 ________________________________________
 ### How to Run
 
-1. Make sure Docker and Docker Compose are installed.
-2. Clone the repository:
+1. Ensure Docker and Docker Compose are installed
+
+2. Clone the repository
+
 git clone <repo-url>
 cd ledger-api
-3. Start the application using Docker:
+
+3. Start the application
+
 docker-compose up --build
-4. Open Swagger UI:
+
+4. Open Swagger UI
+
 http://localhost:8000/docs
 _________________________________________
 ### Screenshots
-
 1. Swagger UI
-![Swagger UI](screenshots/1SwaggerUI.png)
+![Swagger UI](screenshots/swaggerui.png)
 
 2. Account 1 Created
-![Account 1 Created](screenshots/2Acc1Created.png)
-
+![Account 1 Created](screenshots/Acc1Created.png)
+ 
 3. Account 2 Created
-![Account 2 Created](screenshots/3Acc2Created.png)
+![Account 2 Created](screenshots/Acc2Created.png)
 
-4. Transfer Transaction
-![Transfer Transaction](screenshots/4Transfer-Transaction.png)
+4. Deposit Transaction
+![Deposit Transaction](screenshots/deposit.png)
 
-5. Account 1 Balance
-![Account 1 Balance](screenshots/6Acc1Balance.png)
+5. Get Account 1 Details
+![Get Account 1 Details](screenshots/getAccount.png)
 
-6. Account 2 Balance
-![Account 2 Balance](screenshots/7Acc2Balance.png)
+6. Get Account 2 Details
+![Get Account 2 Details](screenshots/getAcc2.png)
 
-7. Debit Ledger Entry
-![Debit Entry](screenshots/8debitEntry.png)
+7. Transfer Transaction
+![Transfer Transaction](screenshots/transfer.png)
 
-8. Credit Ledger Entry
-![Credit Entry](screenshots/9creditEntry.png)
+8. Withdrawal Transaction
+![Withdrawal Transaction](screenshots/Withdrawals.png)
 
-9. Deposit Transaction
-![Deposit](screenshots/10Deposit.png)
+9. Withdrawal Error (Insufficient Balance)
+![Withdrawal Error](screenshots/withdrawError.png)
 
-__________________________________________
+10. Ledger Entries
+![Ledger Entries](screenshots/ledger.png)
+________________________________________
 ### Conclusion
 
 This project demonstrates:
-•	Financial-grade ledger design
-•	Strong transactional consistency
-•	Clean and scalable architecture
-•	Correct application of double-entry bookkeeping
-
+• Correct implementation of double-entry bookkeeping
+• Financial-grade transactional consistency
+• Clean and scalable backend architecture
+• Real-world ledger and audit design principles.

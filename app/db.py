@@ -1,21 +1,53 @@
-import time
 from sqlalchemy import create_engine
-from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.engine import Engine
+from sqlalchemy import event
+import os
 
-DATABASE_URL = "postgresql://postgres:postgres@db:5432/ledger"
+# ---------- DATABASE URL ----------
 
-engine = None
-for i in range(10):
-    try:
-        engine = create_engine(DATABASE_URL)
-        engine.connect()
-        print("✅ Database connected")
-        break
-    except OperationalError:
-        print("⏳ Database not ready, retrying...")
-        time.sleep(2)
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://postgres:admin123@db:5432/ledger_db"  # <-- change db -> localhost
+)
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# ---------- ENGINE ----------
+
+engine = create_engine(
+    DATABASE_URL,
+    echo=False,
+    future=True,
+)
+
+# ---------- SESSION ----------
+
+SessionLocal = sessionmaker(
+    bind=engine,
+    autocommit=False,
+    autoflush=False,
+    expire_on_commit=False,
+)
+
+# ---------- BASE ----------
+
 Base = declarative_base()
 
+# ---------- ENFORCE FOREIGN KEYS (Postgres-safe) ----------
+
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    # This hook exists for compatibility; no-op for PostgreSQL
+    pass
+
+
+# ---------- DEPENDENCY ----------
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
